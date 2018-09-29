@@ -338,6 +338,15 @@ bool ManifestParser::ParseEdge(string* err) {
     edge->pool_ = pool;
   }
 
+  string cpu_weight = edge->GetBinding("cpu_weight");
+  if (!cpu_weight.empty()) {
+    char* end;
+    float cpu_weight_f = strtof(cpu_weight.c_str(), &end);
+    if (*end || cpu_weight_f <= 0)
+      return lexer_.Error("cpu_weight not a positive float: '" + cpu_weight + "'", err);
+    edge->cpu_weight_ = (unsigned)((cpu_weight_f * Edge::cpu_weight_scale) + 0.5f);
+  }
+
   edge->outputs_.reserve(outs.size());
   for (size_t i = 0, e = outs.size(); i != e; ++i) {
     string path = outs[i].Evaluate(env);

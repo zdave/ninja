@@ -409,6 +409,8 @@ void Edge::Dump(const char* prefix) const {
   printf("] 0x%p\n", this);
 }
 
+const unsigned Edge::cpu_weight_scale = 1000;
+
 bool Edge::is_phony() const {
   return rule_ == &State::kPhonyRule;
 }

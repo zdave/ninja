@@ -505,7 +505,7 @@ void Plan::Dump() {
 }
 
 struct RealCommandRunner : public CommandRunner {
-  explicit RealCommandRunner(const BuildConfig& config) : config_(config) {}
+  explicit RealCommandRunner(const BuildConfig& config) : config_(config), subprocs_cpu_weight_(0) {}
   virtual ~RealCommandRunner() {}
   virtual bool CanRunMore();
   virtual bool StartCommand(Edge* edge);
@@ -516,6 +516,8 @@ struct RealCommandRunner : public CommandRunner {
   const BuildConfig& config_;
   SubprocessSet subprocs_;
   map<Subprocess*, Edge*> subproc_to_edge_;
+  // sum(subproc_to_edge_[p]->cpu_weight() for p in subprocs_.running_ + subprocs_.finished_)
+  unsigned subprocs_cpu_weight_;
 };
 
 vector<Edge*> RealCommandRunner::GetActiveEdges() {
@@ -528,12 +530,12 @@ vector<Edge*> RealCommandRunner::GetActiveEdges() {
 
 void RealCommandRunner::Abort() {
   subprocs_.Clear();
+  // Strictly speaking should update subprocs_cpu_weight_ here, but it won't be
+  // used after aborting so don't bother
 }
 
 bool RealCommandRunner::CanRunMore() {
-  size_t subproc_number =
-      subprocs_.running_.size() + subprocs_.finished_.size();
-  return (int)subproc_number < config_.parallelism
+  return subprocs_cpu_weight_ < (config_.parallelism * Edge::cpu_weight_scale)
     && ((subprocs_.running_.empty() || config_.max_load_average <= 0.0f)
         || GetLoadAverage() < config_.max_load_average);
 }
@@ -544,7 +546,7 @@ bool RealCommandRunner::StartCommand(Edge* edge) {
   if (!subproc)
     return false;
   subproc_to_edge_.insert(make_pair(subproc, edge));
-
+  subprocs_cpu_weight_ += edge->cpu_weight();
   return true;
 }
 
@@ -562,6 +564,9 @@ bool RealCommandRunner::WaitForCommand(Result* result) {
   map<Subprocess*, Edge*>::iterator e = subproc_to_edge_.find(subproc);
   result->edge = e->second;
   subproc_to_edge_.erase(e);
+
+  assert(subprocs_cpu_weight_ >= result->edge->cpu_weight());
+  subprocs_cpu_weight_ -= result->edge->cpu_weight();
 
   delete subproc;
   return true;

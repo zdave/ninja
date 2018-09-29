@@ -134,7 +134,8 @@ struct Edge {
     VisitDone
   };
 
-  Edge() : rule_(NULL), pool_(NULL), env_(NULL), mark_(VisitNone),
+  Edge() : rule_(NULL), pool_(NULL), cpu_weight_(cpu_weight_scale),
+           env_(NULL), mark_(VisitNone),
            outputs_ready_(false), deps_missing_(false),
            implicit_deps_(0), order_only_deps_(0), implicit_outs_(0) {}
 
@@ -159,6 +160,7 @@ struct Edge {
 
   const Rule* rule_;
   Pool* pool_;
+  unsigned cpu_weight_;
   vector<Node*> inputs_;
   vector<Node*> outputs_;
   BindingEnv* env_;
@@ -168,6 +170,8 @@ struct Edge {
 
   const Rule& rule() const { return *rule_; }
   Pool* pool() const { return pool_; }
+  static const unsigned cpu_weight_scale;
+  unsigned cpu_weight() const { return cpu_weight_; }
   int weight() const { return 1; }
   bool outputs_ready() const { return outputs_ready_; }
 
